@@ -5,8 +5,11 @@ const formationLeft = document.getElementById("formation-left");
 const formationRight = document.getElementById("formation-right");
 const toolButtons = document.querySelectorAll("[data-tool]");
 const clearLinesButton = document.querySelector("[data-action='clear-lines']");
+const resetBoardButton = document.querySelector("[data-action='reset-board']");
+const storageKey = "fotballtaktikk-board-v1";
 
 const pitchSize = { width: 1000, height: 680 };
+const defaultBall = { x: 500, y: 340 };
 
 const formations = {
   "2-3-1": {
@@ -56,26 +59,36 @@ const state = {
   activePointerId: null,
   activePieceId: null,
   drawStart: null,
-  previewLine: null
+  previewLine: null,
+  suppressSave: false
 };
 
 const pieces = new Map();
 
-createPiece({ id: "ball", label: "", color: "ball", x: 500, y: 340, role: "ball" });
-applyFormation("left", formationLeft.value);
-applyFormation("right", formationRight.value);
+createPiece({ id: "ball", label: "", color: "ball", x: defaultBall.x, y: defaultBall.y, role: "ball" });
+restoreBoard();
 setTool("move");
 
-formationLeft.addEventListener("change", () => applyFormation("left", formationLeft.value));
-formationRight.addEventListener("change", () => applyFormation("right", formationRight.value));
+formationLeft.addEventListener("change", () => {
+  applyFormation("left", formationLeft.value);
+  saveBoard();
+});
+
+formationRight.addEventListener("change", () => {
+  applyFormation("right", formationRight.value);
+  saveBoard();
+});
 
 toolButtons.forEach((button) => {
   button.addEventListener("click", () => setTool(button.dataset.tool));
 });
 
 clearLinesButton.addEventListener("click", () => {
-  drawLayer.querySelectorAll(".drawn-line").forEach((line) => line.remove());
+  clearDrawnLines();
+  saveBoard();
 });
+
+resetBoardButton.addEventListener("click", resetBoard);
 
 pitch.addEventListener("pointerdown", handlePitchPointerDown);
 pitch.addEventListener("pointermove", handlePitchPointerMove);
@@ -194,6 +207,7 @@ function handlePitchPointerUp(event) {
     if (distance > 8) {
       state.previewLine.classList.remove("line-preview");
       state.previewLine.classList.add("drawn-line");
+      saveBoard();
     } else {
       state.previewLine.remove();
     }
@@ -214,6 +228,8 @@ function handlePitchPointerUp(event) {
   if (pitch.hasPointerCapture(event.pointerId)) {
     pitch.releasePointerCapture(event.pointerId);
   }
+
+  saveBoard();
 }
 
 function updateDraggedPiece(event) {
@@ -247,4 +263,88 @@ function updateSvgLine(line, start, end) {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+function clearDrawnLines() {
+  drawLayer.querySelectorAll(".drawn-line").forEach((line) => line.remove());
+}
+
+function resetBoard() {
+  clearDrawnLines();
+  applyFormation("left", formationLeft.value);
+  applyFormation("right", formationRight.value);
+  setPiecePosition("ball", defaultBall.x, defaultBall.y);
+  saveBoard();
+}
+
+function saveBoard() {
+  if (state.suppressSave) {
+    return;
+  }
+
+  const payload = {
+    formations: {
+      left: formationLeft.value,
+      right: formationRight.value
+    },
+    pieces: Array.from(pieces.values()).map((piece) => ({
+      id: piece.id,
+      x: piece.x,
+      y: piece.y
+    })),
+    lines: Array.from(drawLayer.querySelectorAll(".drawn-line")).map((line) => ({
+      x1: Number(line.getAttribute("x1")),
+      y1: Number(line.getAttribute("y1")),
+      x2: Number(line.getAttribute("x2")),
+      y2: Number(line.getAttribute("y2"))
+    }))
+  };
+
+  localStorage.setItem(storageKey, JSON.stringify(payload));
+}
+
+function restoreBoard() {
+  const saved = loadSavedBoard();
+
+  if (!saved) {
+    applyFormation("left", formationLeft.value);
+    applyFormation("right", formationRight.value);
+    saveBoard();
+    return;
+  }
+
+  state.suppressSave = true;
+
+  formationLeft.value = saved.formations?.left || formationLeft.value;
+  formationRight.value = saved.formations?.right || formationRight.value;
+  applyFormation("left", formationLeft.value);
+  applyFormation("right", formationRight.value);
+
+  saved.pieces?.forEach((piece) => {
+    if (pieces.has(piece.id)) {
+      setPiecePosition(piece.id, piece.x, piece.y);
+    }
+  });
+
+  clearDrawnLines();
+  saved.lines?.forEach((lineData) => {
+    const line = createSvgLine(
+      { x: lineData.x1, y: lineData.y1 },
+      { x: lineData.x2, y: lineData.y2 },
+      "drawn-line"
+    );
+    drawLayer.appendChild(line);
+  });
+
+  state.suppressSave = false;
+  saveBoard();
+}
+
+function loadSavedBoard() {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }

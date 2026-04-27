@@ -87,6 +87,16 @@ h1 {
   border-color: #f1f5eb;
 }
 
+.tool-button[data-action="reset-board"] {
+  background: rgba(255, 214, 110, 0.12);
+  border-color: rgba(255, 214, 110, 0.28);
+}
+
+.tool-button[data-action="reset-board"]:hover,
+.tool-button[data-action="reset-board"]:focus-visible {
+  background: rgba(255, 214, 110, 0.2);
+}
+
 .board-panel {
   background: linear-gradient(180deg, rgba(20, 36, 26, 0.96), rgba(13, 24, 17, 0.92));
   border: 1px solid var(--panel-border);
