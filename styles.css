@@ -145,6 +145,11 @@ h1 {
   color: var(--text);
 }
 
+.formation-panel select option {
+  background: #1a2f20;
+  color: #f2f6ef;
+}
+
 .pitch {
   position: relative;
   aspect-ratio: 1000 / 680;
