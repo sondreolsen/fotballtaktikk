@@ -373,6 +373,14 @@ h1 {
   cursor: default;
 }
 
+.pitch.is-draw-mode {
+  touch-action: none;
+}
+
+.pitch.is-draw-mode .pieces-layer {
+  pointer-events: none;
+}
+
 .line-preview,
 .drawn-line {
   fill: none;
