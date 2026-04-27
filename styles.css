@@ -405,4 +405,18 @@ h1 {
     display: grid;
     gap: 10px;
   }
+
+  .piece {
+    width: 18px;
+    height: 18px;
+  }
+
+  .piece.ball {
+    width: 11px;
+    height: 11px;
+  }
+
+  .piece-label {
+    font-size: 0.54rem;
+  }
 }
