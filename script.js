@@ -4,10 +4,12 @@ const drawLayer = document.getElementById("draw-layer");
 const formationLeft = document.getElementById("formation-left");
 const formationRight = document.getElementById("formation-right");
 const toolButtons = document.querySelectorAll("[data-tool]");
+const undoButton = document.querySelector("[data-action='undo']");
 const clearLinesButton = document.querySelector("[data-action='clear-lines']");
 const resetBoardButton = document.querySelector("[data-action='reset-board']");
 const storageKey = "fotballtaktikk-board-v1";
 const defaultFormation = "2-3-1";
+const historyLimit = 100;
 
 const pitchSize = { width: 1000, height: 680 };
 const defaultBall = { x: 500, y: 340 };
@@ -61,7 +63,11 @@ const state = {
   activePieceId: null,
   drawStart: null,
   previewLine: null,
-  suppressSave: false
+  suppressSave: false,
+  suppressHistory: false,
+  history: [],
+  pendingSnapshot: null,
+  dragStartPositions: null
 };
 
 const pieces = new Map();
@@ -71,11 +77,13 @@ restoreBoard();
 setTool("move");
 
 formationLeft.addEventListener("change", () => {
+  pushHistory();
   applyFormation("left", formationLeft.value);
   saveBoard();
 });
 
 formationRight.addEventListener("change", () => {
+  pushHistory();
   applyFormation("right", formationRight.value);
   saveBoard();
 });
@@ -85,10 +93,16 @@ toolButtons.forEach((button) => {
 });
 
 clearLinesButton.addEventListener("click", () => {
+  if (!drawLayer.querySelector(".drawn-line")) {
+    return;
+  }
+
+  pushHistory();
   clearDrawnLines();
   saveBoard();
 });
 
+undoButton.addEventListener("click", undoBoard);
 resetBoardButton.addEventListener("click", resetBoard);
 
 pitch.addEventListener("pointerdown", handlePitchPointerDown);
@@ -161,6 +175,7 @@ function handlePitchPointerDown(event) {
     const start = getPitchPoint(event);
     state.activePointerId = event.pointerId;
     state.drawStart = start;
+    state.pendingSnapshot = createBoardSnapshot();
     state.previewLine = createSvgLine(start, start, "line-preview");
     drawLayer.appendChild(state.previewLine);
     pitch.setPointerCapture(event.pointerId);
@@ -175,6 +190,7 @@ function handlePitchPointerDown(event) {
   const pieceId = pieceElement.dataset.id;
   state.activePointerId = event.pointerId;
   state.activePieceId = pieceId;
+  state.dragStartPositions = capturePiecePositions();
   pieceElement.classList.add("dragging");
   pitch.setPointerCapture(event.pointerId);
   updateDraggedPiece(event);
@@ -206,6 +222,9 @@ function handlePitchPointerUp(event) {
     const distance = Math.hypot(end.x - state.drawStart.x, end.y - state.drawStart.y);
 
     if (distance > 8) {
+      if (state.pendingSnapshot) {
+        pushHistory(state.pendingSnapshot);
+      }
       state.previewLine.classList.remove("line-preview");
       state.previewLine.classList.add("drawn-line");
       saveBoard();
@@ -219,12 +238,25 @@ function handlePitchPointerUp(event) {
     if (piece) {
       piece.element.classList.remove("dragging");
     }
+
+    if (hasPieceMoved(state.dragStartPositions, capturePiecePositions())) {
+      pushHistory({
+        formations: {
+          left: formationLeft.value,
+          right: formationRight.value
+        },
+        pieces: state.dragStartPositions,
+        lines: getCurrentLines()
+      });
+    }
   }
 
   state.activePointerId = null;
   state.activePieceId = null;
   state.drawStart = null;
   state.previewLine = null;
+  state.pendingSnapshot = null;
+  state.dragStartPositions = null;
 
   if (pitch.hasPointerCapture(event.pointerId)) {
     pitch.releasePointerCapture(event.pointerId);
@@ -271,6 +303,7 @@ function clearDrawnLines() {
 }
 
 function resetBoard() {
+  pushHistory();
   formationLeft.value = defaultFormation;
   formationRight.value = defaultFormation;
   clearDrawnLines();
@@ -285,25 +318,7 @@ function saveBoard() {
     return;
   }
 
-  const payload = {
-    formations: {
-      left: formationLeft.value,
-      right: formationRight.value
-    },
-    pieces: Array.from(pieces.values()).map((piece) => ({
-      id: piece.id,
-      x: piece.x,
-      y: piece.y
-    })),
-    lines: Array.from(drawLayer.querySelectorAll(".drawn-line")).map((line) => ({
-      x1: Number(line.getAttribute("x1")),
-      y1: Number(line.getAttribute("y1")),
-      x2: Number(line.getAttribute("x2")),
-      y2: Number(line.getAttribute("y2"))
-    }))
-  };
-
-  localStorage.setItem(storageKey, JSON.stringify(payload));
+  localStorage.setItem(storageKey, JSON.stringify(createBoardSnapshot()));
 }
 
 function restoreBoard() {
@@ -315,6 +330,7 @@ function restoreBoard() {
     applyFormation("left", formationLeft.value);
     applyFormation("right", formationRight.value);
     saveBoard();
+    updateUndoButton();
     return;
   }
 
@@ -343,6 +359,7 @@ function restoreBoard() {
 
   state.suppressSave = false;
   saveBoard();
+  updateUndoButton();
 }
 
 function loadSavedBoard() {
@@ -352,4 +369,102 @@ function loadSavedBoard() {
   } catch {
     return null;
   }
+}
+
+function createBoardSnapshot() {
+  return {
+    formations: {
+      left: formationLeft.value,
+      right: formationRight.value
+    },
+    pieces: capturePiecePositions(),
+    lines: getCurrentLines()
+  };
+}
+
+function capturePiecePositions() {
+  return Array.from(pieces.values()).map((piece) => ({
+    id: piece.id,
+    x: piece.x,
+    y: piece.y
+  }));
+}
+
+function getCurrentLines() {
+  return Array.from(drawLayer.querySelectorAll(".drawn-line")).map((line) => ({
+    x1: Number(line.getAttribute("x1")),
+    y1: Number(line.getAttribute("y1")),
+    x2: Number(line.getAttribute("x2")),
+    y2: Number(line.getAttribute("y2"))
+  }));
+}
+
+function pushHistory(snapshot = createBoardSnapshot()) {
+  if (state.suppressHistory) {
+    return;
+  }
+
+  state.history.push(JSON.stringify(snapshot));
+
+  if (state.history.length > historyLimit) {
+    state.history.shift();
+  }
+
+  updateUndoButton();
+}
+
+function undoBoard() {
+  const previous = state.history.pop();
+  if (!previous) {
+    updateUndoButton();
+    return;
+  }
+
+  state.suppressHistory = true;
+  restoreSnapshot(JSON.parse(previous));
+  state.suppressHistory = false;
+  updateUndoButton();
+}
+
+function restoreSnapshot(snapshot) {
+  state.suppressSave = true;
+
+  formationLeft.value = snapshot.formations?.left || defaultFormation;
+  formationRight.value = snapshot.formations?.right || defaultFormation;
+  applyFormation("left", formationLeft.value);
+  applyFormation("right", formationRight.value);
+
+  snapshot.pieces?.forEach((piece) => {
+    if (pieces.has(piece.id)) {
+      setPiecePosition(piece.id, piece.x, piece.y);
+    }
+  });
+
+  clearDrawnLines();
+  snapshot.lines?.forEach((lineData) => {
+    const line = createSvgLine(
+      { x: lineData.x1, y: lineData.y1 },
+      { x: lineData.x2, y: lineData.y2 },
+      "drawn-line"
+    );
+    drawLayer.appendChild(line);
+  });
+
+  state.suppressSave = false;
+  saveBoard();
+}
+
+function hasPieceMoved(before, after) {
+  if (!before || !after || before.length !== after.length) {
+    return false;
+  }
+
+  return before.some((piece, index) => {
+    const next = after[index];
+    return piece.id !== next.id || piece.x !== next.x || piece.y !== next.y;
+  });
+}
+
+function updateUndoButton() {
+  undoButton.disabled = state.history.length === 0;
 }
