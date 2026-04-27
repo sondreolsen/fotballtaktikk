@@ -7,6 +7,7 @@ const toolButtons = document.querySelectorAll("[data-tool]");
 const clearLinesButton = document.querySelector("[data-action='clear-lines']");
 const resetBoardButton = document.querySelector("[data-action='reset-board']");
 const storageKey = "fotballtaktikk-board-v1";
+const defaultFormation = "2-3-1";
 
 const pitchSize = { width: 1000, height: 680 };
 const defaultBall = { x: 500, y: 340 };
@@ -270,6 +271,8 @@ function clearDrawnLines() {
 }
 
 function resetBoard() {
+  formationLeft.value = defaultFormation;
+  formationRight.value = defaultFormation;
   clearDrawnLines();
   applyFormation("left", formationLeft.value);
   applyFormation("right", formationRight.value);
@@ -307,6 +310,8 @@ function restoreBoard() {
   const saved = loadSavedBoard();
 
   if (!saved) {
+    formationLeft.value = defaultFormation;
+    formationRight.value = defaultFormation;
     applyFormation("left", formationLeft.value);
     applyFormation("right", formationRight.value);
     saveBoard();
@@ -315,8 +320,8 @@ function restoreBoard() {
 
   state.suppressSave = true;
 
-  formationLeft.value = saved.formations?.left || formationLeft.value;
-  formationRight.value = saved.formations?.right || formationRight.value;
+  formationLeft.value = saved.formations?.left || defaultFormation;
+  formationRight.value = saved.formations?.right || defaultFormation;
   applyFormation("left", formationLeft.value);
   applyFormation("right", formationRight.value);
 
