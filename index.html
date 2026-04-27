@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fotball Taktikktavle 7-er</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">7-er fotball</p>
+        <h1>Taktikktavle</h1>
+      </div>
+
+      <div class="toolbar">
+        <button type="button" class="tool-button is-active" data-tool="move">Flytt brikker</button>
+        <button type="button" class="tool-button" data-tool="draw">Tegn streker</button>
+        <button type="button" class="tool-button" data-action="clear-lines">Slett streker</button>
+      </div>
+    </header>
+
+    <section class="board-panel">
+      <div class="pitch-frame">
+        <div class="formation-panel formation-panel-left">
+          <label for="formation-left">R&oslash;dt lag</label>
+          <select id="formation-left" aria-label="Velg formasjon for rodt lag">
+            <option value="2-3-1">2-3-1</option>
+            <option value="3-2-1">3-2-1</option>
+          </select>
+        </div>
+
+        <div class="formation-panel formation-panel-right">
+          <label for="formation-right">Bl&aring;tt lag</label>
+          <select id="formation-right" aria-label="Velg formasjon for blatt lag">
+            <option value="2-3-1">2-3-1</option>
+            <option value="3-2-1">3-2-1</option>
+          </select>
+        </div>
+
+        <div class="pitch" id="pitch" aria-label="Fotballtaktikktavle">
+          <svg class="draw-layer" id="draw-layer" viewBox="0 0 1000 680" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <marker id="arrowhead" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+                <path d="M0,0 L12,6 L0,12 Z" fill="#f7f3e8"></path>
+              </marker>
+            </defs>
+          </svg>
+
+          <div class="pitch-markings" aria-hidden="true">
+            <div class="halfway-line"></div>
+            <div class="center-circle"></div>
+            <div class="center-spot"></div>
+            <div class="penalty-box penalty-box-left"></div>
+            <div class="penalty-box penalty-box-right"></div>
+            <div class="goal-box goal-box-left"></div>
+            <div class="goal-box goal-box-right"></div>
+            <div class="penalty-spot penalty-spot-left"></div>
+            <div class="penalty-spot penalty-spot-right"></div>
+            <div class="goal goal-left"></div>
+            <div class="goal goal-right"></div>
+          </div>
+
+          <div class="pieces-layer" id="pieces-layer"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
